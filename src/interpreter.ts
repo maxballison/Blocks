@@ -8,6 +8,7 @@ import { ASTNode, ErrorHandler } from './types';
  * - error: how we report errors
  * - drawingCommands: for storing e.g. circle(...) calls
  * - running: indicates if we're in a game loop
+ * - keysDown: a set of currently pressed keys
  */
 interface Context {
   globals: Record<string, any>;
@@ -15,12 +16,13 @@ interface Context {
   error: ErrorHandler;
   drawingCommands: { cmd: string; args: number[] }[];
   running: boolean;
+  /** New property to track pressed keys */
+  keysDown: Set<string>;
 }
 
 /** 
  * Interpret the AST once (top-level). 
- * For each top-level node, we call `executeNode(node, context, context.globals)`, 
- * meaning "use the global scope."
+ * For each top-level node, call `executeNode(node, context, context.globals)`.
  */
 export function interpret(ast: ASTNode[], context: Context) {
   ast.forEach(node => {
@@ -30,8 +32,20 @@ export function interpret(ast: ASTNode[], context: Context) {
 
 /**
  * If there's a `run()` function, repeatedly call it via requestAnimationFrame.
+ * Also set up event listeners for capturing key presses.
  */
 export function startProgram(context: Context) {
+  // Initialize our key set
+  context.keysDown = new Set();
+
+  // Listen for keydown/keyup
+  window.addEventListener('keydown', (e) => {
+    context.keysDown.add(e.key);
+  });
+  window.addEventListener('keyup', (e) => {
+    context.keysDown.delete(e.key);
+  });
+
   if (context.functions['run']) {
     context.running = true;
     const loop = () => {
@@ -112,18 +126,14 @@ function executeNode(node: ASTNode, context: Context, scope: Record<string, any>
     }
 
     case 'LoopFor': {
-      // e.g. "loop x=10 times:" or "loop 2 times:"
-      // We'll ignore "varName" for a moment if the user didn't provide it. 
-      // The parser might or might not store that, depending on how you set it up.
+      // e.g. "loop x=10 times:"
       const { varName, count, body } = node;
-      // Create a child scope for the loop
       const loopScope = createChildScope(scope);
 
       for (let i = 0; i < count; i++) {
         if (varName) {
           setVar(varName, i, loopScope);
         }
-        // Execute the loop body in the child scope
         for (const stmt of body) {
           executeNode(stmt, context, loopScope);
         }
@@ -133,7 +143,6 @@ function executeNode(node: ASTNode, context: Context, scope: Record<string, any>
 
     case 'LoopWhile': {
       const { condition, body } = node;
-      // Create a child scope
       const whileScope = createChildScope(scope);
 
       while (evalExpr(condition, context, whileScope)) {
@@ -146,8 +155,6 @@ function executeNode(node: ASTNode, context: Context, scope: Record<string, any>
 
     case 'IfStatement': {
       const { condition, consequent, alternate } = node;
-      // We'll just run if/else in the same scope (no new block scope, 
-      // but you could if you want to mimic Python's behavior).
       if (evalExpr(condition, context, scope)) {
         consequent.forEach(c => executeNode(c, context, scope));
       } else {
@@ -226,26 +233,28 @@ function executeFunction(
  * Evaluate a string expression. 
  * - If numeric, parse it.
  * - If a single variable, read from scope.
- * - Else, fallback to a naive JavaScript eval with known variables.
+ * - Otherwise, fallback to a naive JavaScript eval with known variables,
+ *   plus a special `keyDown` function to check pressed keys.
  */
 function evalExpr(expr: string, context: Context, scope: Record<string, any>): any {
   if (!expr) return undefined;
+
   // numeric?
   if (!isNaN(Number(expr))) {
     return Number(expr);
   }
+
   // single variable?
   if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(expr)) {
-    // try getVar
     return getVar(expr, scope, context);
   }
-  // fallback to JS eval
+
+  // Fallback to naive JS eval
   try {
-    // gather all variables from the scope chain
+    // Gather all variables from the scope chain
     const varNames: string[] = [];
     const varVals: any[] = [];
 
-    // Flatten the scope chain into a single object for eval
     let cur = scope;
     while (cur && cur !== Object.prototype) {
       for (const key of Object.keys(cur)) {
@@ -257,8 +266,20 @@ function evalExpr(expr: string, context: Context, scope: Record<string, any>): a
       cur = Object.getPrototypeOf(cur);
     }
 
-    const f = new Function(...varNames, `return (${expr});`);
-    return f(...varVals);
+    // We'll add a "keyDown" helper so that the user can call keyDown("a")
+    const f = new Function(
+      ...varNames,
+      'keyDown',
+      `return (${expr});`
+    );
+
+    return f(
+      ...varVals,
+      (key: string) => {
+        // Return true if this key is held down
+        return context.keysDown.has(key);
+      }
+    );
   } catch (err) {
     context.error(`Failed to evaluate expression: "${expr}"`);
     return undefined;

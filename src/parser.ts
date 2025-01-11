@@ -72,8 +72,6 @@ export function parse(tokens: Token[]): ASTNode[] {
         const name = match[1];
         const args = match[2].split(',').map(arg => arg.trim()).filter(Boolean);
 
-        // parse block with token.indent as the "parent indent"
-        // so we capture all lines with indent > token.indent
         const body = parseBlock(token.indent);
         return {
           type: 'FunctionDeclaration',
@@ -188,8 +186,7 @@ export function parse(tokens: Token[]): ASTNode[] {
   }
 
   // parse the top-level block, i.e. lines with indent >= 0
-  // Actually, we want lines with indent == 0, so let's do parseBlock(-1)
-  // so we accept lines with indent > -1 => i.e. >= 0
+  // We'll do parseBlock(-1) so we accept lines with indent > -1 => i.e. >= 0
   const ast = parseBlock(-1);
   return ast;
 }
