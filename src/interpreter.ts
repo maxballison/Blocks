@@ -6,24 +6,26 @@ import { ASTNode, ErrorHandler } from './types';
  * - globals: the global scope object (for top-level variables)
  * - functions: stored AST for user-defined functions
  * - error: how we report errors
- * - drawingCommands: for storing e.g. circle(...) calls
+ * - drawingCommands: for storing e.g. circle(...) or rectangle(...) calls
  * - running: indicates if we're in a game loop
  * - keysDown: a set of currently pressed keys
+ * - colorStack: an array of CSS color strings
  */
 interface Context {
   globals: Record<string, any>;
   functions: Record<string, ASTNode>;
   error: ErrorHandler;
-  drawingCommands: { cmd: string; args: number[] }[];
+  drawingCommands: {
+    cmd: string;
+    args: number[];
+    color?: string;  // color to use when drawing
+  }[];
   running: boolean;
-  /** New property to track pressed keys */
   keysDown: Set<string>;
+  colorStack: string[];
 }
 
-/** 
- * Interpret the AST once (top-level). 
- * For each top-level node, call `executeNode(node, context, context.globals)`.
- */
+/** Interpret the AST (top-level). */
 export function interpret(ast: ASTNode[], context: Context) {
   ast.forEach(node => {
     executeNode(node, context, context.globals);
@@ -32,10 +34,11 @@ export function interpret(ast: ASTNode[], context: Context) {
 
 /**
  * If there's a `run()` function, repeatedly call it via requestAnimationFrame.
- * Also set up event listeners for capturing key presses.
+ * Also set up event listeners for capturing key presses,
+ * and initialize the color stack.
  */
 export function startProgram(context: Context) {
-  // Initialize our key set
+  // Initialize pressed-keys set
   context.keysDown = new Set();
 
   // Listen for keydown/keyup
@@ -45,6 +48,9 @@ export function startProgram(context: Context) {
   window.addEventListener('keyup', (e) => {
     context.keysDown.delete(e.key);
   });
+
+  // Initialize color stack with a default color (black)
+  context.colorStack = ['rgb(0,0,0)'];
 
   if (context.functions['run']) {
     context.running = true;
@@ -62,18 +68,12 @@ export function startProgram(context: Context) {
   }
 }
 
-/**
- * Create a child scope that can read from the parent but 
- * stores new variables in its own object.
- */
+/** Create a child scope that can read from the parent but store new variables locally. */
 function createChildScope(parentScope: Record<string, any>): Record<string, any> {
   return Object.create(parentScope);
 }
 
-/**
- * Look up a variable in the given scope chain. 
- * If it's not found, throw an error.
- */
+/** Look up a variable in the scope chain. */
 function getVar(name: string, scope: Record<string, any>, context: Context) {
   if (name in scope) {
     return scope[name];
@@ -82,14 +82,9 @@ function getVar(name: string, scope: Record<string, any>, context: Context) {
   return undefined;
 }
 
-/**
- * Set a variable in the given scope chain. 
- * If it already exists up the chain, overwrite it there; 
- * otherwise define it in the current scope object.
- */
+/** Set a variable in the scope chain. */
 function setVar(name: string, value: any, scope: Record<string, any>) {
   let current: any = scope;
-  // Walk up the chain to see if 'name' is a known property
   while (current && current !== Object.prototype) {
     if (Object.prototype.hasOwnProperty.call(current, name)) {
       current[name] = value;
@@ -101,13 +96,11 @@ function setVar(name: string, value: any, scope: Record<string, any>) {
   scope[name] = value;
 }
 
-/**
- * Execute a single AST node with a given scope object.
- */
+/** Execute a single AST node with a given scope object. */
 function executeNode(node: ASTNode, context: Context, scope: Record<string, any>) {
   switch (node.type) {
     case 'CanvasSize': {
-      // CanvasSize is global
+      // e.g. CanvasSize = (800, 600)
       setVar('CanvasSize', [node.width, node.height], context.globals);
       break;
     }
@@ -126,7 +119,7 @@ function executeNode(node: ASTNode, context: Context, scope: Record<string, any>
     }
 
     case 'LoopFor': {
-      // e.g. "loop x=10 times:"
+      // e.g. loop i=10 times:
       const { varName, count, body } = node;
       const loopScope = createChildScope(scope);
 
@@ -142,6 +135,7 @@ function executeNode(node: ASTNode, context: Context, scope: Record<string, any>
     }
 
     case 'LoopWhile': {
+      // e.g. loop while x<10:
       const { condition, body } = node;
       const whileScope = createChildScope(scope);
 
@@ -154,34 +148,70 @@ function executeNode(node: ASTNode, context: Context, scope: Record<string, any>
     }
 
     case 'IfStatement': {
+      // e.g. if x>10: ...
       const { condition, consequent, alternate } = node;
       if (evalExpr(condition, context, scope)) {
-        consequent.forEach(c => executeNode(c, context, scope));
+        consequent.forEach(stmt => executeNode(stmt, context, scope));
       } else {
-        alternate.forEach(a => executeNode(a, context, scope));
+        alternate.forEach(stmt => executeNode(stmt, context, scope));
       }
       break;
     }
 
     case 'Call': {
-      // e.g. print(x), circle(100, 200, 30), or user-defined function
-      if (node.callee === 'circle') {
-        const [x, y, r] = node.args.map(arg => evalExpr(arg, context, scope));
-        context.drawingCommands.push({ cmd: 'circle', args: [x, y, r] });
-      }
-      else if (node.callee === 'print') {
-        const vals = node.args.map(arg => evalExpr(arg, context, scope));
-        console.log(...vals);
-      }
-      else {
-        // user-defined function
-        executeFunction(node.callee, node.args, context, scope);
+      // e.g. print(x), circle(100, 200, 50), rectangle(...), color(...), etc.
+      const callee = node.callee;
+      const argVals = node.args.map(arg => evalExpr(arg, context, scope));
+
+      if (callee === 'print') {
+        // print(...)
+        console.log(...argVals);
+
+      } else if (callee === 'circle') {
+        // circle(x, y, r)
+        const [x, y, r] = argVals;
+        const topColor = context.colorStack[context.colorStack.length - 1] ?? 'rgb(0,0,0)';
+        context.drawingCommands.push({
+          cmd: 'circle',
+          args: [x, y, r],
+          color: topColor
+        });
+
+      } else if (callee === 'rectangle') {
+        // rectangle(x, y, w, h)
+        const [x, y, w, h] = argVals;
+        const topColor = context.colorStack[context.colorStack.length - 1] ?? 'rgb(0,0,0)';
+        context.drawingCommands.push({
+          cmd: 'rectangle',
+          args: [x, y, w, h],
+          color: topColor
+        });
+
+      } else if (callee === 'color') {
+        // color(r, g, b) => push a new color onto the stack
+        const [r, g, b] = argVals;
+        const colorString = `rgb(${r}, ${g}, ${b})`;
+        context.colorStack.push(colorString);
+        while (context.colorStack.length > 5) {
+            context.colorStack.shift(); // remove the BOTTOM (oldest) color
+          }
+
+      } else if (callee === 'popColor') {
+        // pop the top color
+        context.colorStack.pop();
+        if (context.colorStack.length === 0) {
+          context.colorStack.push('rgb(0,0,0)');
+        }
+
+      } else {
+        // user-defined function call
+        executeFunction(callee, node.args, context, scope);
       }
       break;
     }
 
     case 'ReturnStatement': {
-      // Only relevant inside function calls (handled in `executeFunction`)
+      // only relevant inside function calls
       break;
     }
 
@@ -191,10 +221,7 @@ function executeNode(node: ASTNode, context: Context, scope: Record<string, any>
   }
 }
 
-/**
- * Execute a user-defined function by name, in a scope that 
- * can see the parent's variables.
- */
+/** Execute a user-defined function by name in a new child scope. */
 function executeFunction(
   name: string,
   rawArgs: string[],
@@ -207,10 +234,10 @@ function executeFunction(
     return undefined;
   }
 
-  // create a child scope so that function parameters are local
+  // Create a child scope so that parameters are local
   const funcScope = createChildScope(callerScope);
 
-  // assign arguments
+  // Assign arguments
   for (let i = 0; i < funcNode.args.length; i++) {
     const paramName = funcNode.args[i];
     const argValue = evalExpr(rawArgs[i], context, callerScope);
@@ -230,11 +257,9 @@ function executeFunction(
 }
 
 /**
- * Evaluate a string expression. 
- * - If numeric, parse it.
- * - If a single variable, read from scope.
- * - Otherwise, fallback to a naive JavaScript eval with known variables,
- *   plus a special `keyDown` function to check pressed keys.
+ * Evaluate a string expression.
+ * - Replaces 'and' -> '&&' and 'or' -> '||' so you can use them in your language.
+ * - Also includes 'keyDown' from previous examples for keyboard checks.
  */
 function evalExpr(expr: string, context: Context, scope: Record<string, any>): any {
   if (!expr) return undefined;
@@ -249,7 +274,12 @@ function evalExpr(expr: string, context: Context, scope: Record<string, any>): a
     return getVar(expr, scope, context);
   }
 
-  // Fallback to naive JS eval
+  // Replace 'and' / 'or' with JavaScript operators
+  // (naive approach — might catch "band" or "morph" etc., but good enough for demos)
+  let transformed = expr
+    .replace(/\band\b/g, '&&')
+    .replace(/\bor\b/g, '||');
+
   try {
     // Gather all variables from the scope chain
     const varNames: string[] = [];
@@ -266,19 +296,16 @@ function evalExpr(expr: string, context: Context, scope: Record<string, any>): a
       cur = Object.getPrototypeOf(cur);
     }
 
-    // We'll add a "keyDown" helper so that the user can call keyDown("a")
+    // We'll add "keyDown" so you can do `if keyDown("a") and x>10:`
     const f = new Function(
       ...varNames,
       'keyDown',
-      `return (${expr});`
+      `return (${transformed});`
     );
 
     return f(
       ...varVals,
-      (key: string) => {
-        // Return true if this key is held down
-        return context.keysDown.has(key);
-      }
+      (key: string) => context.keysDown.has(key)
     );
   } catch (err) {
     context.error(`Failed to evaluate expression: "${expr}"`);
