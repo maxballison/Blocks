@@ -300,12 +300,16 @@ function evalExpr(expr: string, context: Context, scope: Record<string, any>): a
     const f = new Function(
       ...varNames,
       'keyDown',
+      'sin',
+      'cos',
       `return (${transformed});`
     );
 
     return f(
       ...varVals,
-      (key: string) => context.keysDown.has(key)
+      (key: string) => context.keysDown.has(key),
+      (val: number) => Math.sin(val),            // sin
+      (val: number) => Math.cos(val)             // cos
     );
   } catch (err) {
     context.error(`Failed to evaluate expression: "${expr}"`);
