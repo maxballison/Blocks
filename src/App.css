@@ -1,42 +1,127 @@
+/* App.css */
+
+/* Root Container: entire page */
 #root {
-  max-width: 1280px;
+  /* If you want a max width, you can do so; here we assume full width */
   margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f1f2f7;
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Top Bar (Run button, snippet toolbar, and errors) */
+.top-bar {
+  display: flex;
+  align-items: center;
+  background: hsl(0, 0%, 100%);
+  padding: 0.5rem 1rem;
+
+  margin-bottom: 0rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.top-bar button {
+  background-color: #4419bc;
+  color: #fff;
+  border: none;
+  outline: none;
+  padding: 0.5rem 1rem;
+  margin-right: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+  border-radius: 5px;
+  transition: background-color 0.2s ease;
+}
+.top-bar button:hover {
+  background-color: #4047ff;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+/* Error messages in the top bar */
+.top-bar .errors {
+  color: #f00;
+  margin-left: 1.5rem;
 }
 
+/* Snippet Toolbar Container */
+.snippet-toolbar {
+  margin-left: 1rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Each snippet "button" */
+.snippet-button {
+  background: #444;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 0.75rem;
+
+  cursor: grab;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: background 0.2s ease;
+}
+.snippet-button:hover {
+  background: #555;
+}
+
+/* Main area that contains the editor & canvas in columns */
+.main-area {
+  flex: 1;
+  display: flex;
+  gap: 1rem;
+}
+
+/* Editor column */
+.editor-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 400px; /* optional, for layout constraints */
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Canvas column */
+.canvas-section {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Optional "card" style for the actual canvas container */
+.canvas-inner {
+  background: #fafafa;
+  border: 1px solid #ddd;
+  width: fit-content;
+  height: fit-content;
+  position: relative;
+}
+
+/* Example card style if needed */
 .card {
   padding: 2em;
+  background: #fff;
+  margin: 1em auto;
+  max-width: 600px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
 
 .read-the-docs {
   color: #888;
+}
+canvas {
+  display: block;
+  margin: 0;
+  padding: 0;
 }

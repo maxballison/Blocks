@@ -1,16 +1,10 @@
 // components/CanvasView.tsx
-import React, { useEffect, useRef } from 'react';
-
-interface DrawingCommand {
-  cmd: string;
-  args: number[];
-  color?: string;  // <--- we now support an optional color
-}
+import React, { useRef, useEffect } from 'react';
 
 interface CanvasViewProps {
   width: number;
   height: number;
-  drawingCommands: DrawingCommand[];
+  drawingCommands: { cmd: string; args: number[]; color?: string }[];
 }
 
 const CanvasView: React.FC<CanvasViewProps> = ({ width, height, drawingCommands }) => {
@@ -20,39 +14,26 @@ const CanvasView: React.FC<CanvasViewProps> = ({ width, height, drawingCommands 
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
 
-    // Clear the entire canvas
+    // Clear
     ctx.clearRect(0, 0, width, height);
 
-    // Draw each command
-    drawingCommands.forEach(command => {
-      // If a color was specified, use it; otherwise fallback to e.g. 'blue'
-      ctx.fillStyle = command.color ?? 'blue';
+    // Draw all commands
+    for (const { cmd, args, color } of drawingCommands) {
+      ctx.fillStyle = color ?? '#000';
 
-      if (command.cmd === 'circle') {
-        // circle(x, y, r)
-        const [x, y, r] = command.args;
+      if (cmd === 'circle') {
+        const [x, y, r] = args;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
-      } else if (command.cmd === 'rectangle') {
-        // rectangle(x, y, w, h)
-        const [x, y, w, h] = command.args;
+      } else if (cmd === 'rectangle') {
+        const [x, y, w, h] = args;
         ctx.fillRect(x, y, w, h);
       }
-    });
+    }
   }, [width, height, drawingCommands]);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      style={{
-        border: '1px solid #666',
-        backgroundColor: '#fff',
-      }}
-    />
-  );
+  return <canvas ref={canvasRef} width={width} height={height} />;
 };
 
 export default CanvasView;

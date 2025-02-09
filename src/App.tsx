@@ -2,8 +2,10 @@
 import React, { useState } from 'react';
 import Editor from './components/Editor';
 import CanvasView from './components/CanvasView';
+import { SnippetToolbar } from './components/SnippetToolbar'; // Our snippet toolbar
 import { lex, parse } from './parser';
 import { interpret, startProgram } from './interpreter';
+import './App.css'; // <-- Import the new CSS
 
 function App() {
   const [code, setCode] = useState<string>(`# Example program
@@ -55,6 +57,8 @@ function run():
       },
       drawingCommands: [] as { cmd: string; args: number[] }[],
       running: false,
+      keysDown: new Set<string>(),
+      colorStack: [],
     };
 
     interpret(ast, context);
@@ -69,7 +73,7 @@ function run():
     // 5. Start program
     startProgram(context);
 
-    // Poll commands for each frame
+    // 6. Poll commands for each frame
     const pollCommands = () => {
       if (!context.running) return;
       setDrawingCommands([...context.drawingCommands]);
@@ -79,12 +83,19 @@ function run():
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      {/* Top Bar */}
-      <div style={{ padding: '8px', background: '#ccc', display: 'flex', alignItems: 'center' }}>
-        <button onClick={runCode} style={{ marginRight: '8px' }}>Run</button>
+    <div id="root">
+      {/* Top bar with Run button & snippet toolbar */}
+      <div className="top-bar">
+
+        <div className="snippet-toolbar">
+          <SnippetToolbar />
+        </div>
+        <button onClick={runCode} className="run-button" style={{ marginLeft: 'auto' }}>
+        Run
+        </button>
+
         {errors.length > 0 && (
-          <div style={{ color: 'red', marginLeft: '16px' }}>
+          <div className="errors">
             {errors.map((e, i) => (
               <div key={i}>{e}</div>
             ))}
@@ -92,28 +103,21 @@ function run():
         )}
       </div>
 
-      {/* Main Area: Editor (Left) & Canvas (Right) */}
-      <div style={{ flex: 1, display: 'flex' }}>
-        {/* Editor Section */}
-        <div style={{ flex: 1, borderRight: '1px solid #ccc' }}>
+      {/* Main two-column layout: Editor & Canvas */}
+      <div className="main-area">
+        <div className="editor-section">
           <Editor code={code} onChange={setCode} />
         </div>
 
-        {/* Canvas Section */}
-        <div 
-          style={{ 
-            flex: 1, 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            background: '#f7f7f7' 
-          }}
-        >
-          <CanvasView
-            width={canvasSize[0]}
-            height={canvasSize[1]}
-            drawingCommands={drawingCommands}
-          />
+        <div className="canvas-section">
+          {/* If you want a small 'card' style wrap: */}
+          <div className="canvas-inner">
+            <CanvasView
+              width={canvasSize[0]}
+              height={canvasSize[1]}
+              drawingCommands={drawingCommands}
+            />
+          </div>
         </div>
       </div>
     </div>
