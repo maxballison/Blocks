@@ -1,15 +1,62 @@
-/* App.css */
+/* 
+  App.css
+  All CSS for the entire application is consolidated here.
+*/
 
 /* Root Container: entire page */
 #root {
-  /* If you want a max width, you can do so; here we assume full width */
   margin: 0 auto;
-  padding: 1rem;
+  padding: 0;
   display: flex;
   flex-direction: column;
   height: 100vh;
   background: #f1f2f7;
   font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* NAVBAR ------------------------------------------------------- */
+.navbar-container {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  padding: 0.5rem 1rem;
+}
+
+.navbar-logo {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-right: 2rem;
+}
+
+.navbar-tabs {
+  display: flex;
+  gap: 1rem;
+}
+
+.navbar-tab {
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  color: #333;
+  transition: color 0.2s ease;
+}
+
+.navbar-tab:hover {
+  color: #4419bc;
+}
+
+.navbar-tab.active {
+  font-weight: 600;
+  border-bottom: 2px solid #4419bc;
+  color: #4419bc;
+}
+
+/* PROJECT ------------------------------------------------------ */
+/* Container that holds the entire "Project" content */
+.project-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 /* Top Bar (Run button, snippet toolbar, and errors) */
@@ -18,12 +65,11 @@
   align-items: center;
   background: hsl(0, 0%, 100%);
   padding: 0.5rem 1rem;
-
-  margin-bottom: 0rem;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
-.top-bar button {
+/* The "Run" button styling */
+.top-bar button.run-button {
   background-color: #4419bc;
   color: #fff;
   border: none;
@@ -35,7 +81,8 @@
   border-radius: 5px;
   transition: background-color 0.2s ease;
 }
-.top-bar button:hover {
+
+.top-bar button.run-button:hover {
   background-color: #4047ff;
 }
 
@@ -52,13 +99,38 @@
   gap: 0.5rem;
 }
 
+.top-bar button.stop-button {
+  background-color: #bbb;
+  color: #333;
+  border: none;
+  outline: none;
+  padding: 0.5rem 1rem;
+  margin-right: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+  border-radius: 5px;
+  transition: background-color 0.2s ease;
+}
+.top-bar button.stop-button:hover {
+  background-color: #999;
+}
+
+/* Error area at the bottom of the project container */
+.error-area {
+  background: #fdf3f3;
+  color: #d00;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #ddd;
+  /* Ensure it doesn't shrink out of view in a flex column */
+  flex-shrink: 0;
+}
+
 /* Each snippet "button" */
 .snippet-button {
   background: #444;
   color: #fff;
   border: none;
   padding: 0.5rem 0.75rem;
-
   cursor: grab;
   font-size: 0.9rem;
   display: inline-flex;
@@ -75,6 +147,7 @@
   flex: 1;
   display: flex;
   gap: 1rem;
+  height: 100%;
 }
 
 /* Editor column */
@@ -108,20 +181,22 @@
   position: relative;
 }
 
-/* Example card style if needed */
-.card {
-  padding: 2em;
-  background: #fff;
-  margin: 1em auto;
-  max-width: 600px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-}
-
-.read-the-docs {
-  color: #888;
-}
+/* A default style for <canvas> */
 canvas {
   display: block;
   margin: 0;
   padding: 0;
+}
+
+/* DOCUMENTATION ----------------------------------------------- */
+.documentation-container {
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.documentation-container h1,
+.documentation-container h2,
+.documentation-container h3 {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
 }
