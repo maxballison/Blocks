@@ -1,128 +1,100 @@
 import React from 'react';
 
-function Documentation() {
-  return (
-    <div className="documentation-container">
-      <h1>Programming Language Interpreter Documentation</h1>
+const Documentation: React.FC = () => {
+    return (
+        <div style={{ fontFamily: 'Arial, sans-serif', margin: '40px' }}>
+            <h1>Blocks Programming Language Documentation</h1>
+            <p>Welcome to the documentation for the Blocks Programming Language. This language allows you to create graphical programs using a simple, Python-like syntax.</p>
+            
+            <h2>Getting Started</h2>
+            <p>To write a program, define the canvas size and create a function named <code>run()</code>, which will execute in a loop.</p>
+            
+            <h3>Example Program</h3>
+            <pre>
+<code>{`# Set canvas size
+CanvasSize = (500, 500)
 
-      <h2>Overview</h2>
-      <p>
-        This document describes the functionality of the interpreter for your custom programming
-        language. The interpreter processes an Abstract Syntax Tree (AST) and executes code within
-        a runtime environment. The language includes support for basic drawing operations,
-        conditional statements, loops, functions, and variable assignments.
-      </p>
+x = 0
 
-      <h2>Runtime Context</h2>
-      <p>
-        The interpreter operates within a <code>Context</code> object that maintains execution
-        state, including:
-      </p>
-      <ul>
-        <li>
-          <strong>globals</strong>: Stores top-level variables.
-        </li>
-        <li>
-          <strong>functions</strong>: Stores AST representations of user-defined functions.
-        </li>
-        <li>
-          <strong>error</strong>: Error handling mechanism.
-        </li>
-        <li>
-          <strong>drawingCommands</strong>: List of graphical commands such as <code>circle(...)</code> and <code>rectangle(...)</code>.
-        </li>
-        <li>
-          <strong>running</strong>: Indicates if execution is in a game loop.
-        </li>
-        <li>
-          <strong>keysDown</strong>: Tracks currently pressed keys.
-        </li>
-        <li>
-          <strong>colorStack</strong>: Stack of active colors for drawing.
-        </li>
-      </ul>
+function run():
+    circle(x, 300, 30)
+    x = x + 2
+    if x > 500:
+        x = 0`}</code>
+            </pre>
+            
+            <h2>Syntax & Features</h2>
+            <h3>Variables</h3>
+            <p>Variables are assigned using <code>=</code> and can store numbers, lists, or expressions.</p>
+            <pre>
+<code>{`x = 10
+y = x + 5
+board = [[0, 0], [0, 1]]`}</code>
+            </pre>
 
-      <h2>Execution Model</h2>
-      <h3><code>interpret(ast: ASTNode[], context: Context)</code></h3>
-      <p>
-        This function takes an AST and executes it by calling <code>executeNode</code> on each node.
-      </p>
+            <h3>Functions</h3>
+            <p>Define a function using <code>function name(args):</code>. The <code>run()</code> function is required for animation.</p>
+            <pre>
+<code>{`function greet(name):
+    print("Hello, " + name)
 
-      <h3><code>startProgram(context: Context)</code></h3>
-      <p>
-        If a <code>run()</code> function is defined, this initializes the execution loop:
-      </p>
-      <ol>
-        <li>Clears the drawing command list on each frame.</li>
-        <li>Calls the <code>run()</code> function.</li>
-        <li>Uses <code>requestAnimationFrame</code> for continuous execution.</li>
-        <li>Sets up key event listeners.</li>
-        <li>Initializes the color stack.</li>
-      </ol>
+greet("Alice")`}</code>
+            </pre>
+            
+            <h3>Loops</h3>
+            <p>Use <code>loop x=10 times:</code> for fixed iterations or <code>loop while condition:</code> for condition-based loops.</p>
+            <pre>
+<code>{`loop x=5 times:
+    print(x)
 
-      <h2>Variable Scope and Management</h2>
-      <h3><code>createChildScope(parentScope: Record&lt;string, any&gt;)</code></h3>
-      <p>Creates a new scope that inherits from a parent scope.</p>
-
-      <h3><code>getVar(name: string, scope: Record&lt;string, any&gt;, context: Context)</code></h3>
-      <p>Retrieves a variable from the scope chain.</p>
-
-      <h3><code>setVar(name: string, value: any, scope: Record&lt;string, any&gt;)</code></h3>
-      <p>Sets or updates a variable in the scope chain.</p>
-
-      <h2>AST Node Execution</h2>
-      <h3><code>executeNode(node: ASTNode, context: Context, scope: Record&lt;string, any&gt;)</code></h3>
-      <p>Handles different types of AST nodes:</p>
-      <ul>
-        <li><strong>CanvasSize</strong>: Defines canvas dimensions.</li>
-        <li><strong>FunctionDeclaration</strong>: Stores user-defined functions.</li>
-        <li><strong>Assignment</strong>: Assigns values to variables.</li>
-        <li><strong>LoopFor</strong>: Executes a loop for a given number of iterations.</li>
-        <li><strong>LoopWhile</strong>: Executes a loop while a condition is true.</li>
-        <li><strong>IfStatement</strong>: Executes conditional logic.</li>
-        <li><strong>Call</strong>: Executes function calls (built-in or user-defined).</li>
-        <li><strong>ReturnStatement</strong>: Handles function return values.</li>
-      </ul>
-
-      <h2>Built-in Functions</h2>
-      <h3><code>print(...)</code></h3>
-      <p>Prints values to the console.</p>
-
-      <h3><code>circle(x, y, r)</code></h3>
-      <p>
-        Draws a circle at <code>(x, y)</code> with radius <code>r</code> using the top color from <code>colorStack</code>.
-      </p>
-
-      <h3><code>rectangle(x, y, w, h)</code></h3>
-      <p>
-        Draws a rectangle at <code>(x, y)</code> with width <code>w</code> and height <code>h</code> using
-        the top color from <code>colorStack</code>.
-      </p>
-
-      <h3><code>color(r, g, b)</code></h3>
-      <p>Pushes an RGB color onto <code>colorStack</code>.</p>
-
-      <h3><code>popColor()</code></h3>
-      <p>Removes the top color from <code>colorStack</code>.</p>
-
-      <h2>Function Execution</h2>
-      <h3><code>executeFunction(name: string, rawArgs: string[], context: Context, callerScope: Record&lt;string, any&gt;)</code></h3>
-      <p>Runs a user-defined function in a new scope, binding parameters to arguments.</p>
-
-      <h2>Expression Evaluation</h2>
-      <h3><code>evalExpr(expr: string, context: Context, scope: Record&lt;string, any&gt;)</code></h3>
-      <p>
-        Evaluates expressions, supporting:
-      </p>
-      <ul>
-        <li>Mathematical operations (e.g., <code>x + y</code>)</li>
-        <li>Boolean expressions (<code>and</code>, <code>or</code>)</li>
-        <li>Variable references</li>
-        <li>Keyboard checks (<code>keyDown("a")</code>)</li>
-        <li>Trigonometric functions (<code>sin(x)</code>, <code>cos(x)</code>)</li>
-      </ul>
-    </div>
-  );
-}
+loop while x < 10:
+    x = x + 1`}</code>
+            </pre>
+            
+            <h3>Conditionals</h3>
+            <p>Use <code>if</code> and <code>else</code> for conditional execution.</p>
+            <pre>
+<code>{`if x > 5:
+    print("x is big")
+else:
+    print("x is small")`}</code>
+            </pre>
+            
+            <h2>Built-in Functions</h2>
+            <h3>Drawing Functions</h3>
+            <ul>
+                <li><code>circle(x, y, r)</code> - Draws a circle at (x, y) with radius r.</li>
+                <li><code>rectangle(x, y, w, h)</code> - Draws a rectangle at (x, y) with width w and height h.</li>
+                <li><code>color(r, g, b)</code> - Sets the current drawing color.</li>
+                <li><code>popColor()</code> - Restores the previous color.</li>
+            </ul>
+            
+            <h3>Math & Utility Functions</h3>
+            <ul>
+                <li><code>random()</code> - Returns a random number between 0 and 1.</li>
+                <li><code>floor(x)</code> - Returns the largest integer less than or equal to x.</li>
+                <li><code>abs(x)</code> - Returns the absolute value of x.</li>
+                <li><code>sin(x)</code>, <code>cos(x)</code> - Trigonometric functions.</li>
+            </ul>
+            
+            <h3>Input Functions</h3>
+            <ul>
+                <li><code>keyDown("key")</code> - Checks if a key is pressed.</li>
+            </ul>
+            
+            <h2>Execution</h2>
+            <p>The <code>run()</code> function executes continuously. If no <code>run()</code> function is found, an error is thrown.</p>
+            <p>To stop execution, use the stop button in the interface.</p>
+            
+            <h2>Errors</h2>
+            <p>Errors will appear in the output panel. Common issues include:</p>
+            <ul>
+                <li>Undefined variables</li>
+                <li>Syntax errors</li>
+                <li>Calling undefined functions</li>
+            </ul>
+        </div>
+    );
+};
 
 export default Documentation;

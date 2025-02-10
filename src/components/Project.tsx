@@ -10,12 +10,16 @@ function Project() {
 CanvasSize = (500, 500)
 
 x = 0
-
+sz = 3
 function run():
-    circle(x, 300, 30)
+    circle(x, 300, sz)
+    sz = sz + 0.1
     x = x + 2
     if x > 500:
         x = 0
+    if sz > 200:
+        sz = 3
+
 `);
 
   const [errors, setErrors] = useState<string[]>([]);

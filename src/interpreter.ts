@@ -92,15 +92,51 @@ function setVar(name: string, value: any, scope: Record<string, any>) {
     }
     current = Object.getPrototypeOf(current);
   }
-  // Not found, define in the current scope
+  // Not found, define it in the current scope
   scope[name] = value;
+}
+
+/**
+ * Helper to assign a value to a left-hand side expression that might contain bracket indexing,
+ * e.g. "board[2]" or "board[2][3]".
+ */
+function setValueToExpression(lhs: string, newVal: any, context: Context, scope: Record<string, any>) {
+  if (!lhs.includes('[')) {
+    // no bracket indexing, just a variable
+    setVar(lhs, newVal, scope);
+    return;
+  }
+
+  // e.g. "board[2][3]" => split by '[' => ["board", "2]", "3]"]
+  const parts = lhs.split('[');
+  const baseName = parts.shift()!.trim(); // e.g. "board"
+  let obj = getVar(baseName, scope, context);
+  if (obj === undefined) return;
+
+  while (parts.length > 0) {
+    // "2]" => bracketContent = "2"
+    const bracketContent = parts.shift()!.replace(']', '').trim();
+    // Evaluate bracket content, in case it's an expression
+    const index = evalExpr(bracketContent, context, scope);
+
+    if (parts.length === 0) {
+      // last one, assign
+      obj[index] = newVal;
+    } else {
+      // go deeper
+      obj = obj[index];
+      if (obj === undefined) {
+        context.error(`Cannot set property [${index}] on undefined object.`);
+        return;
+      }
+    }
+  }
 }
 
 /** Execute a single AST node with a given scope object. */
 function executeNode(node: ASTNode, context: Context, scope: Record<string, any>) {
   switch (node.type) {
     case 'CanvasSize': {
-      // e.g. CanvasSize = (800, 600)
       setVar('CanvasSize', [node.width, node.height], context.globals);
       break;
     }
@@ -112,18 +148,21 @@ function executeNode(node: ASTNode, context: Context, scope: Record<string, any>
     }
 
     case 'Assignment': {
-      // e.g. x = 5
+      // x = 5, or board[2][3] = 10, or board = [[0,0],[0,0]]
+      const lhs = node.varName;
       const value = evalExpr(node.value, context, scope);
-      setVar(node.varName, value, scope);
+      setValueToExpression(lhs, value, context, scope);
       break;
     }
 
     case 'LoopFor': {
-      // e.g. loop i=10 times:
-      const { varName, count, body } = node;
+      // loop r=EXPR times:
+      const { varName, countExpr, body } = node;
       const loopScope = createChildScope(scope);
 
-      for (let i = 0; i < count; i++) {
+      const countVal = evalExpr(countExpr, context, loopScope);
+      const max = Number(countVal) || 0;  // ensure numeric
+      for (let i = 0; i < max; i++) {
         if (varName) {
           setVar(varName, i, loopScope);
         }
@@ -135,7 +174,6 @@ function executeNode(node: ASTNode, context: Context, scope: Record<string, any>
     }
 
     case 'LoopWhile': {
-      // e.g. loop while x<10:
       const { condition, body } = node;
       const whileScope = createChildScope(scope);
 
@@ -148,7 +186,6 @@ function executeNode(node: ASTNode, context: Context, scope: Record<string, any>
     }
 
     case 'IfStatement': {
-      // e.g. if x>10: ...
       const { condition, consequent, alternate } = node;
       if (evalExpr(condition, context, scope)) {
         consequent.forEach(stmt => executeNode(stmt, context, scope));
@@ -159,64 +196,52 @@ function executeNode(node: ASTNode, context: Context, scope: Record<string, any>
     }
 
     case 'Call': {
-      // e.g. print(x), circle(100, 200, 50), rectangle(...), color(...), etc.
+      // e.g. print(x), circle(100,200,50), color(255,0,0), or user-defined function
       const callee = node.callee;
       const argVals = node.args.map(arg => evalExpr(arg, context, scope));
 
       if (callee === 'print') {
-        // print(...)
         console.log(...argVals);
 
       } else if (callee === 'circle') {
-        // circle(x, y, r)
-        const [x, y, r] = argVals;
-        const topColor = context.colorStack[context.colorStack.length - 1] ?? 'rgb(0,0,0)';
-        context.drawingCommands.push({
-          cmd: 'circle',
-          args: [x, y, r],
-          color: topColor
-        });
+        const [cx, cy, r] = argVals;
+        const col = context.colorStack[context.colorStack.length - 1] ?? 'rgb(0,0,0)';
+        context.drawingCommands.push({ cmd: 'circle', args: [cx, cy, r], color: col });
 
       } else if (callee === 'rectangle') {
-        // rectangle(x, y, w, h)
         const [x, y, w, h] = argVals;
-        const topColor = context.colorStack[context.colorStack.length - 1] ?? 'rgb(0,0,0)';
-        context.drawingCommands.push({
-          cmd: 'rectangle',
-          args: [x, y, w, h],
-          color: topColor
-        });
+        const col = context.colorStack[context.colorStack.length - 1] ?? 'rgb(0,0,0)';
+        context.drawingCommands.push({ cmd: 'rectangle', args: [x, y, w, h], color: col });
 
       } else if (callee === 'color') {
-        // color(r, g, b) => push a new color onto the stack
         const [r, g, b] = argVals;
         const colorString = `rgb(${r}, ${g}, ${b})`;
         context.colorStack.push(colorString);
+        // limit stack to 5
         while (context.colorStack.length > 5) {
-            context.colorStack.shift(); // remove the BOTTOM (oldest) color
-          }
+          context.colorStack.shift();
+        }
 
       } else if (callee === 'popColor') {
-        // pop the top color
         context.colorStack.pop();
         if (context.colorStack.length === 0) {
           context.colorStack.push('rgb(0,0,0)');
         }
 
       } else {
-        // user-defined function call
+        // user-defined function
         executeFunction(callee, node.args, context, scope);
       }
       break;
     }
 
     case 'ReturnStatement': {
-      // only relevant inside function calls
+      // only relevant in function calls
       break;
     }
 
     default:
-      // no-op or unknown
+      // unknown or Noop
       break;
   }
 }
@@ -234,10 +259,9 @@ function executeFunction(
     return undefined;
   }
 
-  // Create a child scope so that parameters are local
   const funcScope = createChildScope(callerScope);
 
-  // Assign arguments
+  // assign parameters
   for (let i = 0; i < funcNode.args.length; i++) {
     const paramName = funcNode.args[i];
     const argValue = evalExpr(rawArgs[i], context, callerScope);
@@ -249,17 +273,16 @@ function executeFunction(
     if (stmt.type === 'ReturnStatement') {
       returnValue = evalExpr(stmt.expression, context, funcScope);
       break;
-    } else {
-      executeNode(stmt, context, funcScope);
     }
+    executeNode(stmt, context, funcScope);
   }
   return returnValue;
 }
 
 /**
  * Evaluate a string expression.
- * - Replaces 'and' -> '&&' and 'or' -> '||' so you can use them in your language.
- * - Also includes 'keyDown' from previous examples for keyboard checks.
+ * - Replaces `and` -> `&&` and `or` -> `||` so you can use them in your language.
+ * - Exposes built-in and user-defined functions inside expressions.
  */
 function evalExpr(expr: string, context: Context, scope: Record<string, any>): any {
   if (!expr) return undefined;
@@ -269,19 +292,19 @@ function evalExpr(expr: string, context: Context, scope: Record<string, any>): a
     return Number(expr);
   }
 
-  // single variable?
+  // single variable? (only if no bracket or parenthesis)
   if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(expr)) {
     return getVar(expr, scope, context);
   }
 
-  // Replace 'and' / 'or' with JavaScript operators
-  // (naive approach — might catch "band" or "morph" etc., but good enough for demos)
+  // Replace 'and' / 'or' with JS operators
   let transformed = expr
     .replace(/\band\b/g, '&&')
     .replace(/\bor\b/g, '||');
 
+  // We'll feed it into a Function for evaluation
   try {
-    // Gather all variables from the scope chain
+    // gather all variables from the scope chain
     const varNames: string[] = [];
     const varVals: any[] = [];
 
@@ -296,23 +319,60 @@ function evalExpr(expr: string, context: Context, scope: Record<string, any>): a
       cur = Object.getPrototypeOf(cur);
     }
 
-    // We'll add "keyDown" so you can do `if keyDown("a") and x>10:`
+    // Also gather all user-defined function names so we can expose them in the expression
+    // We'll create a small JS wrapper for each user-defined function name
+    const userFuncNames = Object.keys(context.functions);
+    const userFuncWrappers = userFuncNames.map(fname => {
+      // We create a function that calls "executeFunction(fname, args, context, scope)"
+      return function(...jsArgs: any[]) {
+        // We'll need to do a little trick: convert jsArgs into string expressions
+        // Actually, we can store them in a hidden array variable in the scope
+        // but let's do something simpler: we can pass them as "raw" and rely on the
+        // internal system. We'll just treat them as if they're numeric or string.
+        // For more advanced usage, you might need a more robust approach.
+        const strArgs = jsArgs.map(x => JSON.stringify(x));
+        return executeFunction(fname, strArgs, context, scope);
+      };
+    });
+
+    // We'll add random, floor, abs, etc. too
+    const builtins = {
+      keyDown: (key: string) => context.keysDown.has(key),
+      sin: (val: number) => Math.sin(val),
+      cos: (val: number) => Math.cos(val),
+      random: () => Math.random(),
+      floor: (val: number) => Math.floor(val),
+      abs: (val: number) => Math.abs(val),
+    };
+
+    // Build the new Function argument list
+    // e.g. new Function(varNames..., userFuncNames..., 'keyDown', 'sin', 'cos', 'random', 'floor', 'abs', `return (${transformed});`)
     const f = new Function(
       ...varNames,
+      ...userFuncNames,
       'keyDown',
       'sin',
       'cos',
+      'random',
+      'floor',
+      'abs',
       `return (${transformed});`
     );
 
+    // call the newly constructed function
     return f(
       ...varVals,
-      (key: string) => context.keysDown.has(key),
-      (val: number) => Math.sin(val),            // sin
-      (val: number) => Math.cos(val)             // cos
+      ...userFuncWrappers,
+      builtins.keyDown,
+      builtins.sin,
+      builtins.cos,
+      builtins.random,
+      builtins.floor,
+      builtins.abs
     );
+
   } catch (err) {
-    context.error(`Failed to evaluate expression: "${expr}"`);
-    return undefined;
+        context.error(`Failed to evaluate expression: "${expr}"\nCause: ${err.message}\nStack: ${err.stack}`);
+        return undefined;
   }
 }
